@@ -65,7 +65,9 @@ struct RoadLengthHandler : public osmium::handler::Handler {
 }; // struct RoadLengthHandler
 
 
-std::map<int64_t, int> edges_refs;
+std::map<int64_t, osmium::Way> ways_obj;
+
+typedef std::pair<int64_t, osmium::Way> TWaysPair;
 
 std::map<int64_t, int> nodes_refs;
 
@@ -99,9 +101,7 @@ struct MyHandler: public osmium::handler::Handler {
 
             	std::cout << "WayNode " << it->ref() << " " << it->location() << '\n';
 
-//                if (std::next(it) != wnl.end()) {
-//                    sum_length += distance(it->location(), std::next(it)->location());
-//                }
+
             }
 
 
@@ -109,7 +109,7 @@ struct MyHandler: public osmium::handler::Handler {
 
 
 		const char* highway = way.tags()["highway"];
-		int value;
+//		int value;
 		int64_t id;
 
 		if (highway) {
@@ -118,22 +118,16 @@ struct MyHandler: public osmium::handler::Handler {
 
 			std::lock_guard<std::mutex> guard(nodes_refs_mutex);
 
-			id = way.id();
 
-			value = edges_refs[id];
+			ways_obj.insert(TWaysPair(way.id(), way));
 
-			edges_refs[id] = value + 1;
-
+			//ways_obj[way.id()] = way;
 
             for (auto it = wnl.begin(); it != wnl.end(); ++it) {
 
             	//std::cout << "WayNode " << it->ref() << " " << it->location() << '\n';
 
-            	id = it->ref();
-
-            	value = nodes_refs[id];
-
-    			nodes_refs[id] = value + 1;
+            	nodes_refs[it->ref()]++;
 
             }
 
@@ -157,9 +151,26 @@ int main(int argc, char* argv[]) {
 	const char * filename = "/home/marco/csv/utrecht-latest.osm.pbf";
 
 
+/*
+ *
+ *  https://help.openstreetmap.org/questions/19213/how-can-i-convert-an-osm-xml-file-into-a-graph-representation
+ *
+    1 - parse all ways; throw away those that are not roads, and for the others,
+    remember the node IDs they consist of, by incrementing a "link counter" for each node referenced.
+
+    2 - parse all ways a second time; a way will normally become one edge, but if any nodes apart from
+    the first and the last have a link counter greater than one, then split the way into two edges at that point.
+    Nodes with a link counter of one and which are neither first nor last can be thrown away unless you need to compute
+    the length of the edge.
+
+    3 - (if you need geometry for your graph nodes) parse the nodes section of the XML now, recording coordinates
+    for all nodes that you have retained.
+ *
+ */
 
 
 	std::cout << "starting...\n";
+	std::cout << "phase 1\n";
 
     try {
         // Initialize the reader with the filename from the command line and
@@ -193,7 +204,18 @@ int main(int argc, char* argv[]) {
         std::exit(1);
     }
 
-	std::cout << "summary:\n" << "#ways with tag highway: " << edges_refs.size() << "\n";
+    std::cout << "phase 2\n";
+
+//    for(auto val : ways_obj )
+//    {
+//    	osmium::Way& value = val.second;
+//    	int64_t key = val.first;
+//
+//
+//    }
+
+
+	std::cout << "summary:\n" << "#ways with tag highway: " << ways_refs.size() << "\n";
     std::cout << "summary:\n" << "#nodes of ways with tag highway: " << nodes_refs.size() << "\n";
 
 }
