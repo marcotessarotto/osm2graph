@@ -23,6 +23,8 @@
 #include <cstdlib>  // for std::exit
 #include <iostream> // for std::cout, std::cerr
 #include <map> // map
+#include <list>
+#include <vector>
 #include <mutex>
 
 // Allow any format of input files (XML, PBF, ...)
@@ -49,29 +51,61 @@ using location_handler_type = osmium::handler::NodeLocationsForWays<index_type>;
 
 // This handler only implements the way() function, we are not interested in
 // any other objects.
-struct RoadLengthHandler : public osmium::handler::Handler {
+//struct RoadLengthHandler : public osmium::handler::Handler {
+//
+//    double length = 0;
+//
+//    // If the way has a "highway" tag, find its length and add it to the
+//    // overall length.
+//    void way(const osmium::Way& way) {
+//        const char* highway = way.tags()["highway"];
+//        if (highway) {
+//            length += osmium::geom::haversine::distance(way.nodes());
+//        }
+//    }
+//
+//}; // struct RoadLengthHandler
 
-    double length = 0;
 
-    // If the way has a "highway" tag, find its length and add it to the
-    // overall length.
-    void way(const osmium::Way& way) {
-        const char* highway = way.tags()["highway"];
-        if (highway) {
-            length += osmium::geom::haversine::distance(way.nodes());
-        }
-    }
+struct my_node {
+	int64_t id;
 
-}; // struct RoadLengthHandler
+	int32_t m_x;
+	int32_t m_y;
+
+};
+
+
+struct my_edge {
+	int64_t id;
+
+//	my_node & start;
+//	my_node & end;
+
+	std::list<int64_t> nodes;
+};
+
+
+std::map<int64_t, my_node> my_nodes;
+
+std::map<int64_t, my_edge> my_edges;
+
+int64_t my_node_counter;
+int64_t my_edge_counter;
+
+
+/////////////////////////
 
 
 std::map<int64_t, osmium::Way> ways_obj;
 
-typedef std::pair<int64_t, osmium::Way> TWaysPair;
+std::vector<int64_t> ways_list;
 
 std::map<int64_t, int> nodes_refs;
 
 std::mutex nodes_refs_mutex;
+
+int64_t max_way_id = -1;
 
 
 struct MyHandler: public osmium::handler::Handler {
@@ -119,9 +153,13 @@ struct MyHandler: public osmium::handler::Handler {
 			std::lock_guard<std::mutex> guard(nodes_refs_mutex);
 
 
-			ways_obj.insert(TWaysPair(way.id(), way));
 
-			//ways_obj[way.id()] = way;
+			id = way.id();
+
+			ways_list.push_back(id);
+
+			if (max_way_id < id)
+				max_way_id = id;
 
             for (auto it = wnl.begin(); it != wnl.end(); ++it) {
 
@@ -138,6 +176,8 @@ struct MyHandler: public osmium::handler::Handler {
 
 	void node(const osmium::Node& node) {
 		//std::cout << "node " << node.id() << '\n';
+
+		//node.location();
 	}
 
 };
@@ -215,8 +255,10 @@ int main(int argc, char* argv[]) {
 //    }
 
 
-	std::cout << "summary:\n" << "#ways with tag highway: " << ways_refs.size() << "\n";
+	std::cout << "summary:\n" << "#ways with tag highway: " << ways_list.size() << "\n";
     std::cout << "summary:\n" << "#nodes of ways with tag highway: " << nodes_refs.size() << "\n";
+
+    std::cout << "max_way_id: " << max_way_id << '\n';
 
 }
 
